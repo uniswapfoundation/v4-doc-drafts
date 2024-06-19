@@ -1,0 +1,17 @@
+# ERC-6909 and Uniswap V4
+
+## Overview
+
+ERC-6909 is a minimal and gas-efficient standard for managing multiple token types within a single contract. It provides a simplified alternative to the more complex ERC-1155 multi-token standard. Uniswap V4 utilizes ERC-6909 to implement claim tokens, which represent user balances within the protocol.
+
+## Integration with Uniswap V4
+
+Uniswap V4 utilizes the ERC-6909 standard to implement claim tokens, which represent user balances within the protocol. The `PoolManager` contract in Uniswap V4 inherits from the `ERC6909Claims` contract, which itself inherits from the base `ERC6909` contract.
+
+The `ERC6909Claims` contract extends the functionality of `ERC6909` by adding an internal `_burnFrom` function. This function allows burning tokens from a specific address, with the necessary permissions checks.
+
+In the context of Uniswap V4, claim tokens are used to represent user balances within the `PoolManager`. When users deposit tokens into the `PoolManager`, they receive claim tokens in return. These claim tokens can be used for various purposes, such as participating in liquidity provision, staking, or governance.
+
+The `PoolManager` contract leverages the `ERC6909Claims` functionality to manage claim tokens. It uses the `_mint` function to create new claim tokens when users deposit funds and the `_burnFrom` function to burn claim tokens when users withdraw their funds or when claim tokens need to be destroyed.
+
+By utilizing the ERC-6909 standard, Uniswap V4 achieves a gas-efficient and streamlined approach to managing multiple token types within the protocol. 
