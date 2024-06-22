@@ -1,6 +1,27 @@
 # IPoolManager
 
-The `IPoolManager` interface defines the main methods for interacting with the Uniswap V4 pool manager contract. It exposes the core liquidity management and swap functionality.
+The `IPoolManager` interface defines the main methods for interacting with the Uniswap V4 pool manager contract. It exposes the core _swap lifecycle_ operations
+
+## ModifyLiquidityParams
+
+Structure used to modify liquidity in a pool.
+
+- `tickLower`: Lower tick boundary of the position
+- `tickUpper`: Upper tick boundary of the position
+- `liquidityDelta`: Amount of liquidity to add (positive) or remove (negative)
+- `salt`: A value to set if you want unique liquidity positions at the same range 
+
+Used in the `modifyLiquidity` function to add or remove liquidity from a specific position in the pool.
+
+## SwapParams
+
+Structure used to execute a swap in a pool.
+
+- `zeroForOne`: Direction of the swap (true for token0 to token1, false for token1 to token0)
+- `amountSpecified`: Amount of tokens to swap (positive for exact input, negative for exact output)
+- `sqrtPriceLimitX96`: Slippage limit represented as [Q64X96](https://uniswapv3book.com/milestone_3/more-on-fixed-point-numbers.html#:~:text=The%20Q64.,and%2018%20signify%20decimal%20places.) notation
+
+Used in the `swap` function to define the behavior of our swap.
 
 ## Methods
 
@@ -12,7 +33,7 @@ function initialize(PoolKey memory key, uint160 sqrtPriceX96, bytes calldata hoo
     returns (int24 tick);
 ```
 
-Initializes the state for a given pool ID with the specified parameters.
+Initialize a new pool by defining its parameters: token pair, fee tier, tick spacing, hook contract, and starting price
 
 | Param Name    | Type      | Description                                     |
 |---------------|-----------|--------------------------------------------------|
@@ -46,7 +67,8 @@ function modifyLiquidity(
 ) external returns (BalanceDelta, BalanceDelta);
 ```
 
-Modifies the liquidity for the given pool. Can be used to add, remove, or update a liquidity position.
+Modifies the liquidity for the given pool. Can be used to add or remove liquidity, or collect fees
+> passing zero will collect fees for the given tick range
 
 | Param Name | Type                  | Description                                     |
 |------------|------------------------|--------------------------------------------------|
