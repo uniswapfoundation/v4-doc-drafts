@@ -1,6 +1,6 @@
 # BalanceDelta
 
-`BalanceDelta` is a type used in Uniswap V4 to represent the balance changes of two tokens (token0 and token1) in a single `int256` value. It is designed to efficiently store and manipulate these balance deltas, with the upper 128 bits representing the change in token0 (`amount0`) and the lower 128 bits representing the change in token1 (`amount1`).
+`BalanceDelta` is a type used in Uniswap V4 to represent the balance changes of two tokens (token0 and token1). It tightly packs the two values in a single 256 bits. It is designed to efficiently store and manipulate these balance deltas, with the upper 128 bits representing the change in token0 (`amount0`) and the lower 128 bits representing the change in token1 (`amount1`).
 
 ## Purpose
 
@@ -133,11 +133,8 @@ Returns the extracted `amount1` value as an `int128`.
 
 ## Usage in Hooks
 
-When a hook is called during a swap or liquidity modification, it can perform custom logic and interact with the pool's balances. However, to maintain the correctness of the pool's state, the hook must ensure that any balance changes it introduces are properly accounted for and net to zero.
-
-The hook can use the `amount0` and `amount1` functions of `BalanceDeltaLibrary` to extract the individual balance deltas for each token from the `BalanceDelta` value. It can then perform its custom logic, update the balances accordingly, and create a new `BalanceDelta` value representing the net balance changes.
-
-At the end of the hook's execution, the `BalanceDelta` value should have `amount0` and `amount1` both equal to zero, indicating that the hook did not introduce any net balance changes. If the `BalanceDelta` value is non-zero, it means that the hook has modified the balances in an unexpected way, and the pool's integrity may be compromised.
+When a hook is called during a swap or liquidity modification, it can perform custom logic and interact with the pool's balances. However, to maintain the correctness of the pool's state, the hook must ensure that any balance changes it introduces are properly accounted for and net to zero at the end of its execution.
+The BalanceDelta is forwarded to the `afterSwap` & `afterAddliquidity`, `afterRemoveLiquidity` hooks.  
 
 ## Usage in the Pool Library
 
