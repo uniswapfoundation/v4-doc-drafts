@@ -1,5 +1,3 @@
-Certainly. Here's the complete documentation for the Currency type and CurrencyLibrary with the added clarifications:
-
 # Currency
 
 `Currency` is a custom type that represents either native currency (ETH) or ERC20 tokens.
