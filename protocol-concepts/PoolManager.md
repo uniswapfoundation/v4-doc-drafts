@@ -18,12 +18,10 @@ The primary purpose of the `PoolManager` is to:
 - All pool state and logic are encapsulated within the `PoolManager` contract
 
 ### Locking Mechanism
-- The `PoolManager` uses a locking mechanism to ensure atomicity and correctness of operations that happen in hooks
-- The contract can be locked and unlocked using the `unlock` function
-- When unlocked, the calling contract can perform various operations and settle outstanding balances before returning control to the `PoolManager`
+- The `PoolManager` uses a locking mechanism to allow for _flash accounting_ (also known as deferred balance accounting).
+- When unlocked, the calling contract can perform various operations and zero-out outstanding balances before returning control to the `PoolManager` for final solvency checks
 
 ### Pool State
-- The `PoolManager` maintains a mapping called `_pools`, which associates a `PoolId` with its corresponding `Pool.State` struct
 - The `Pool.State` struct contains information such as:
     - Current price
     - Liquidity
@@ -46,7 +44,7 @@ The primary purpose of the `PoolManager` is to:
 - The `PoolManager` initializes the pool state and associates it with a unique `PoolId`
 
 ### Swaps
-- Swaps are initiated through the `swap` function on the `PoolManager`
+- Swaps are initiated through the `swap` function on the `PoolManager`, typically via a swap router contract
 - The `PoolManager` executes the following steps:
     1. Checks if the pool is valid and initialized
     2. Executes the `beforeSwap` hook, if applicable

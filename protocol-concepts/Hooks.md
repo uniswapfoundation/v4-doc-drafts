@@ -2,39 +2,34 @@
 
 ## Overview
 
-Uniswap V4 introduces a powerful and flexible hook system that allows developers to customize and extend the behavior of liquidity pools. Hooks are external smart contracts that can be attached to individual pools to intercept and modify the execution flow at specific points during pool-related actions.
+Uniswap V4 introduces Hooks, a system that allows developers to customize and extend the behavior of liquidity pools. 
+Hooks are external smart contracts that can be attached to individual pools. Every pool can have one hook but a hook can serve an infinite amount of pools to intercept and modify the execution flow at specific points during pool-related actions.
 
 ## Key Concepts
 
 ### Pool-Specific Hooks
 
-- Each liquidity pool in Uniswap V4 has its own hook contract attached to it.
+- Each liquidity pool in Uniswap V4 can have its own hook contract attached to it. Hooks are optional for Uniswap V4 pools. 
 - The hook contract is specified when creating a new pool in the `PoolManager.initialize` function.
 - Having pool-specific hooks allows for fine-grained control and customization of individual pools.
 
-### Hook Functions
-
-- Hooks provide a set of predefined functions that can be implemented by developers to customize pool behavior.
-- These functions are called by the `PoolManager` at specific stages during the execution of pool-related actions.
-- Developers can implement custom logic, perform additional checks, or modify parameters within these hook functions.
-
-### Hook Permissions
-
-- Hook contracts specify the permissions that determine which hook functions they implement.
-- Permissions are defined using the `Hooks.Permissions` struct, where each permission corresponds to a specific hook function.
-- The `PoolManager` uses these permissions to determine which hook functions to call for a given pool.
-
 ## Core Hook Functions
+Uniswap V4 provides a set of core hook functions that can be implemented by developers. Developers do not have to implement
+every hook, you can mix&match them to whatever your liking is. You can use one or all of them!
 
-Uniswap V4 provides a set of core hook functions that can be implemented by developers:
+- Hook contracts specify the permissions that determine which hook functions they implement, which is encoded in the address of the contract.
+- The `PoolManager` uses these permissions to determine which hook functions to call for a given pool based on it's Key.
+
+
 
 ### Initialize Hooks
 
 - `beforeInitialize`: Called before a new pool is initialized.
 - `afterInitialize`: Called after a new pool is initialized.
-- These hooks allow developers to perform custom actions or validations during pool initialization.
+- These hooks allow developers to perform custom actions or validations during pool initialization, but these hooks can only be invoked once.
 
 ### Liquidity Modification Hooks
+The liquidty modification hooks are extremely granular for security purposes. 
 
 - `beforeAddLiquidity`: Called before liquidity is added to a pool.
 - `afterAddLiquidity`: Called after liquidity is added to a pool.
