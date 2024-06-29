@@ -9,7 +9,7 @@ Before explaining `BeforeSwapDelta` in detail, it is worth noting that in the co
 
 ## Purpose
 
-The main purpose of `BeforeSwapDelta` is to efficiently encode and decode balance changes for both specified and unspecified tokens in a single `int256` value. This compact representation allows for gas-efficient operations and seamless integration with Uniswap V4's hook system.
+The main purpose of `BeforeSwapDelta` is to efficiently encode and decode balance changes for both specified and unspecified tokens in a single 256-bit value. This compact representation allows for gas-efficient operations and seamless integration with Uniswap V4's hook system.
 
 `BeforeSwapDelta` is essential for:
 
