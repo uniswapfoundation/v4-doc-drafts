@@ -104,7 +104,7 @@ Returns the extracted unspecified token delta as an `int128`.
 
 ## Usage in Hooks
 
-When a hook is called during a swap operation, it can perform custom logic and interact with the pool's balances. The `beforeSwap` hook returns a `BeforeSwapDelta` value to indicate any balance changes it introduces. This value can then be forwarded to the `afterSwap` hook, allowing for proper accounting and balance reconciliation.
+When a hook is called during a swap operation, it can perform custom logic and interact with the pool's balances. The `beforeSwap` hook returns a `BeforeSwapDelta` value to indicate any balance changes the *hook* introduces. For example, hooks taking fees should return the value it took as a `BeforeSwapDelta`.
 
 ## Usage in PoolManager.sol
 
