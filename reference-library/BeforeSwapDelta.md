@@ -14,7 +14,6 @@ The main purpose of `BeforeSwapDelta` is to efficiently encode and decode balanc
 `BeforeSwapDelta` is essential for:
 
 - Allowing hooks to modify swap parameters or override default swap behavior
-- Enabling information passing between `beforeSwap` and `afterSwap` hooks
 - Providing fine-grained control over balance adjustments resulting from swaps
 - Optimizing gas usage by packing two `int128` values into a single `int256`
 
