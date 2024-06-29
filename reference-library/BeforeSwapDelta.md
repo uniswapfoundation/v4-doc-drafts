@@ -147,7 +147,6 @@ BalanceDelta hookDelta;
 The `BeforeSwapDelta` serves several important purposes in this context:
 
 1. **Customization of Swap Behavior:** It allows hooks to modify the swap parameters or even completely override the default swap behavior.
-2. **Information Passing:** It provides a way for the `beforeSwap` hook to pass information to the `afterSwap` hook, enabling more complex and stateful hook logic.
 3. **Balance Adjustment:** The delta values can be used to adjust the final balance changes resulting from the swap, giving hooks fine-grained control over the swap's outcome.
 4. **Gas Optimization:** By packing two `int128` values into a single `int256`, it reduces the number of stack variables and can lead to gas savings.
 
