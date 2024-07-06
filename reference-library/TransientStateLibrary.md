@@ -8,6 +8,12 @@ The `TransientStateLibrary` is a crucial component of Uniswap V4, providing util
 
 Uniswap V4 uses transient storage to optimize gas costs and improve efficiency. Transient storage, introduced in EIP-1153, is a way to store data that is only needed for the duration of a transaction, without persisting it to the blockchain's state trie. This is achieved using the `TLOAD` and `TSTORE` opcodes.
 
+Key points about transient storage in Uniswap V4:
+
+1. **PoolManager and** `exttload`: Instead of exposing custom getters for transient storage, the PoolManager implements an `exttload` (external tload) function. This function serves as an external wrapper for the `TLOAD` opcode, providing a standardized interface for accessing transient storage.
+2. **TransientStateLibrary's Role:** The `TransientStateLibrary` acts as an intermediary, making calls to the PoolManager's `exttload` function to access transient storage. This abstraction simplifies the interaction with transient storage for other parts of the Uniswap V4 ecosystem.
+3. **Standardization:** By channeling all transient storage access through the PoolManager's `exttload` function, Uniswap V4 ensures a consistent and controlled approach to managing transient data across the protocol.
+
 Common operations that involve transient state include:
 
 - Checking reserves (`getReserves`)
@@ -15,17 +21,7 @@ Common operations that involve transient state include:
 - Syncing currency states (`sync`)
 - Settling currency balances (`settle`)
 
-### Storage Slots
-
-The library defines constant storage slots for different pieces of transient state:
-
-``` solidity
-bytes32 public constant RESERVES_OF_SLOT = 0x1e0745a7db1623981f0b2a5d4232364c00787266eb75ad546f190e6cebe9bd95;
-bytes32 public constant NONZERO_DELTA_COUNT_SLOT = 0x7d4b3164c6e45b97e7d87b7125a44c5828d005af88f9d751cfd78729c5d99a0b;
-bytes32 public constant IS_UNLOCKED_SLOT = 0xc090fc4683624cfc3884e9d8de5eca132f2d0ec062aff75d43c0465d5ceeab23;
-```
-
-These slots are computed using `keccak256` hashes of specific strings, ensuring unique storage locations for each piece of data.
+This architecture allows Uniswap V4 to benefit from the gas efficiency of transient storage while maintaining a clean and standardized interface for interacting with this temporary data.
 
 ## Functions
 
@@ -83,6 +79,11 @@ Fetches the current delta for a specific caller and currency from the PoolManage
 
 - `int256`: The delta value for the specified caller and currency
 
+**Notes:**
+
+- A **negative** delta indicates an amount that must be **paid or settled** by the caller. In other words, a negative delta means the caller owes that amount and needs to pay or settle it.
+- A **positive** delta indicates an amount that is owed to the caller. This delta amount must be **taken or claimed** by the caller.
+
 ### isUnlocked
 
 ```solidity
@@ -109,14 +110,20 @@ The `TransientStateLibrary` plays a critical role in Uniswap V4's operation:
 
 ## Integration with PoolManager
 
-The `TransientStateLibrary` is designed to work closely with the `PoolManager` contract. All functions in this library take an `IPoolManager` instance as their first parameter, allowing them to interact with the PoolManager's transient storage.
+The `TransientStateLibrary` is designed to work closely with the `PoolManager` contract. The `TransientStateLibrary` can be easily integrated with the `PoolManager` contract using the `using` keyword for syntactic sugar. This allows you to call the library functions as if they were methods of the `IPoolManager` instance. Here's an example:
 
-## Security Considerations
+```solidity
+import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
+import {TransientStateLibrary} from "v4-core/src/libraries/TransientStateLibrary.sol";
 
-When using this library, it's important to note:
+contract Example {
+    using TransientStateLibrary for IPoolManager;
 
-1. The library relies on transient storage, which is cleared at the end of each transaction. Any critical state that needs to persist across transactions should not solely rely on this mechanism.
-2. The `isUnlocked` function is crucial for ensuring that certain operations are only performed when the contract is in the correct state. Always check this before performing sensitive operations.
-3. The `currencyDelta` function returns signed integers. Be careful when performing arithmetic with these values to avoid underflows or overflows.
+    function example() external {
+        int256 delta = manager.currencyDelta(address(this), currency);
+        // Use the delta value...
+    }
+}
+```
 
-By leveraging the `TransientStateLibrary`, Uniswap V4 achieves a balance between efficiency and security in managing its transient state, contributing to the overall robustness of the protocol.
+In this example, the `using TransientStateLibrary for IPoolManager;` statement allows you to call `currencyDelta` directly on the `manager` instance, making your code more readable and concise.
