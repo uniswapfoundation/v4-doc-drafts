@@ -4,12 +4,16 @@ Uniswap v4 introduces dynamic fees, allowing for flexible and responsive fee str
 
 ## What are Dynamic Fees?
 
-Unlike the static fee tiers in Uniswap v3 (0.05%, 0.30%, 1.0%) or the single fee in v2, dynamic fees in v4 can:
+Dynamic fees in Uniswap v4 are a specific type of swap fee paid by swappers that directly accrue to liquidity providers. These fees are distinct from protocol fees and hook fees (Optional fees that can be implemented by custom hooks), and represent a significant advancement over the fee structures in previous Uniswap versions.
+
+Unlike the static fee tiers in Uniswap v3 (0.05%, 0.30%, 1.0%) or the single fee in v2, dynamic fees in v4 offer much more flexibility. Dynamic fees can:
 
 - Adjust in real-time based on various market conditions
 - Change on a per-swap basis
 - Allow for any fee percentage (e.g., 4.9 bips, 10 bips)
 - Be updated at various intervals (yearly, per block, or per transaction)
+
+This dynamic nature allows for more efficient fee pricing, potentially benefiting both liquidity providers and traders by adapting to current market conditions. By allowing fees to fluctuate based on market dynamics, Uniswap v4 aims to optimize liquidity provision and trading across a wide range of market scenarios.
 
 ## Motivation and Benefits of Dynamic Fees
 
@@ -36,6 +40,14 @@ Unlike the static fee tiers in Uniswap v3 (0.05%, 0.30%, 1.0%) or the single fee
 12. **Transaction-source based approach:** Provide lower fees for transactions routed through certain aggregators or sources less likely to be arbitrage trades.
 
 ## Dynamic Fees Mechanism
+
+In Uniswap v4, the dynamic fee capability of a pool is determined at pool creation and is immutable. This means that whether a pool uses dynamic fees or not is set when the pool is initially created and cannot be changed afterwards.
+For pools that do use dynamic fees, Uniswap v4 supports two primary methods for updating the fee:
+
+1. **Periodic Updates via PoolManager:** Fees can be updated by calling the `updateDynamicLPFee` function on the PoolManager contract at specified intervals.
+2. **Per-Swap Updates via beforeSwap Hook:** Fees can be dynamically set for each swap by returning the fee from the `beforeSwap` hook. This allows hooks to override the LP fee for each swap in dynamic fee pools.
+
+These methods offer flexibility in implementing various fee strategies. For more detailed information on implementing these methods, please refer to our [Dynamic Fees Implementation Guide](https://uniswap-docs-staging.vercel.app/documentation/featured-guides/hooks/v4/guides-for-solidity-contracts/dynamic-fee-pools).
 
 ### 2.1 Initialize Dynamic Fee Pool
 
@@ -145,7 +157,7 @@ function updateDynamicLPFee(PoolKey memory key, uint24 newFee) external {
 }
 ```
 
-This updateDynamicLPFee function updates the LP fee for a dynamic fee pool. It can only be called by the pool's hook contract.
+This `updateDynamicLPFee` function updates the LP fee for a dynamic fee pool. It can only be called by the pool's hook contract.
 
 2. Uniswap v4 introduces an override fee mechanism that allows hooks to set a fee for a specific swap:
 
