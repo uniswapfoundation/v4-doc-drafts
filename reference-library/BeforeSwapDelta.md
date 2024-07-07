@@ -4,8 +4,8 @@
 
 Before explaining `BeforeSwapDelta` in detail, it is worth noting that in the context of Uniswap V4 swaps:
 
-- The "specified" token is the one for which the user specifies an exact input or output amount.
-- The "unspecified" token is the counterpart in the swap, whose amount is determined by the pool's pricing mechanism.
+- The **specified** token is the one for which the user specifies an exact input or output amount.
+- The **unspecified** token is the counterpart in the swap, whose amount is determined by the pool's pricing mechanism.
 
 ## Purpose
 
@@ -73,7 +73,7 @@ assembly ("memory-safe") {
 BeforeSwapDelta public constant ZERO_DELTA = BeforeSwapDelta.wrap(0);
 ```
 
-A constant representing a zero delta (no balance changes). Should be used as a default return value. Most commonly used for hooks that are *not* implementing custom accounting
+A constant representing a zero delta (no balance changes). It should be used as a default return value. It is most commonly used for hooks that are *not* implementing custom accounting.
 
 ### getSpecifiedDelta
 
@@ -109,9 +109,11 @@ When a hook is called during a swap operation, it can perform custom logic and i
 
 ## Usage in PoolManager.sol
 
-Here's how `BeforeSwapDelta` is used in the PoolManager contract:
+`BeforeSwapDelta` plays a crucial role in Uniswap V4's PoolManager contract, particularly in the swap process. Here's an overview of how it's used:
 
-1. In the `swap` function of the PoolManager contract, the `beforeSwap` hook is called:
+### Calling the `beforeSwap` Hook
+
+In the `swap` function of the PoolManager contract, the `beforeSwap` hook is called:
 
 ```solidity
 function swap(PoolKey memory key, IPoolManager.SwapParams memory params, bytes calldata hookData)
@@ -135,20 +137,128 @@ function swap(PoolKey memory key, IPoolManager.SwapParams memory params, bytes c
 
 The `beforeSwap` hook returns a `BeforeSwapDelta` value along with other parameters.
 
-- This `beforeSwapDelta` can then be passed to the `afterSwap` hook:
+### Interaction between `beforeSwapDelta` and `amountToSwap`
+
+The `beforeSwapDelta` returned by the hook is used in conjunction with `params.amountSpecified` to determine the final `amountToSwap`. This allows hooks to modify the swap amount based on their custom logic. Here's a more detailed explanation of how this works:
+
+1. The `beforeSwap` hook returns a `BeforeSwapDelta` value.
+2. The `getSpecifiedDelta()` of this `BeforeSwapDelta` is used to adjust the original `params.amountSpecified`.
+3. This adjustment results in the final `amountToSwap` that will be used for the actual swap operation.
+
+Here's a simplified representation of this calculation:
 
 ```solidity
-BalanceDelta hookDelta;
-(swapDelta, hookDelta) = key.hooks.afterSwap(key, params, swapDelta, hookData, beforeSwapDelta);
+int256 amountToSwap = params.amountSpecified + beforeSwapDelta.getSpecifiedDelta();
 ```
 
-The `BeforeSwapDelta` serves several important purposes in this context:
+In this example, the `amountToSwap` is calculated by adding the specified delta from `beforeSwapDelta` to the original `amountSpecified`. This calculation allows hooks to increase or decrease the swap amount, effectively implementing features like fees, rebates, or other custom logic.
+
+**Detailed Example:**
+
+Let's say a user wants to swap 100 tokens, but a hook implements a 1% fee:
+
+1. `params.amountSpecified` would be 100
+2. The hook calculates the fee as 1 token and returns a `beforeSwapDelta` with a specified delta of -1
+3. `amountToSwap` is then calculated as 100 + (-1) = 99
+
+This way, the actual amount swapped (99) reflects the fee taken by the hook, while still allowing the pool to execute the swap based on the original 100 token input from the user.
+
+Here's how the `beforeSwap` hook might handle this:
+
+```solidity
+function beforeSwap(
+    address,
+    PoolKey calldata,
+    IPoolManager.SwapParams calldata params,
+    bytes calldata
+) external override returns (int256 amountIn, BeforeSwapDelta delta, uint24) {
+    int128 specifiedAmount = params.amountSpecified.toInt128();
+    int128 fee = specifiedAmount / 100;  // 1% fee
+    int128 adjustedAmount = specifiedAmount - fee;
+    
+    delta = BeforeSwapDelta.from(-fee, 0);  // Fee taken from specified token
+    amountIn = params.amountSpecified;  // Original amount
+    
+    return (amountIn, delta, 0);
+}
+```
+
+After this hook executes:
+
+- `amountIn` remains 100 (the original `params.amountSpecified`)
+- `delta` represents a change of -1 in the specified token (the fee)
+
+Then, in the PoolManager:
+
+```solidity
+int256 amountToSwap = params.amountSpecified + beforeSwapDelta.getSpecifiedDelta();
+// This effectively calculates: 100 + (-1) = 99
+```
+
+As a result:
+
+- The pool sees the full input amount of 100 tokens.
+- The actual amount swapped is 99 tokens.
+- The 1 token difference becomes the hook's fee.
+
+This mechanism allows hooks to influence the swap amount while maintaining transparency about the full input amount, enabling complex custom logic within the Uniswap V4 framework.
+
+### Relation to `afterSwap`
+
+While `beforeSwapDelta` is primarily used in the `beforeSwap` hook, it also plays a role in the `afterSwap` process. Specifically:
+
+- The `afterSwap` hook receives the `beforeSwapDelta` as a parameter.
+- The unspecified delta (`beforeSwapDelta.getUnspecifiedDelta()`) is particularly important in the `afterSwap` context.
+- This unspecified delta is accounted for in `afterSwap`'s calculations, allowing for consistent balance tracking across the entire swap process.
+
+This mechanism ensures that:
+
+1. Changes made by the `beforeSwap` hook are properly considered when finalizing the swap.
+2. The `afterSwap` hook can make informed decisions based on the full context of the swap, including any modifications made in `beforeSwap`.
+3. Complex swap logic can be implemented across multiple hook points while maintaining consistency.
+
+For example, if a fee was taken on the specified token in `beforeSwap`, the `afterSwap` hook can use this information to ensure the overall balance changes are correct, potentially adjusting the unspecified token amount accordingly.
+
+Developers implementing custom hooks should be aware of this relationship and ensure their `beforeSwap` and `afterSwap` implementations work together coherently, especially when implementing features like fees or rebates that affect token balances.
+
+## Key Purposes of BeforeSwapDelta
+
+The `BeforeSwapDelta` serves several important purposes in the Uniswap V4 swap process:
 
 1. **Customization of Swap Behavior:** It allows hooks to modify the swap parameters or even completely override the default swap behavior.
-3. **Balance Adjustment:** The delta values can be used to adjust the final balance changes resulting from the swap, giving hooks fine-grained control over the swap's outcome.
-4. **Gas Optimization:** By packing two `int128` values into a single `int256`, it reduces the number of stack variables and can lead to gas savings.
+2. **Balance Adjustment:** The delta values can be used to adjust the final balance changes resulting from the swap, giving hooks fine-grained control over the swap's outcome.
+3. **Gas Optimization:** By packing two `int128` values into a single `int256`, it reduces the number of stack variables and can lead to gas savings.
+4. **Cross-Hook Communication:** It provides a way for the `beforeSwap` hook to pass information to the `afterSwap` hook, enabling more complex and stateful hook logic.
+5. **Hook Fees Implementation:** `BeforeSwapDelta` offers flexible options for implementing hook fees:
 
-This usage of `BeforeSwapDelta` is central to the flexibility and extensibility of Uniswap V4's hook system, allowing for custom swap logic while maintaining a standardized interface for all pools.
+- Fees can be charged on either the specified or unspecified token.
+- Fees can be implemented in either the `beforeSwap` or `afterSwap` hook.
+- For `beforeSwap`:
+
+1. Adjust the specified amount to account for the fee.
+2. Useful for scenarios where the fee needs to be known before the swap execution.
+
+
+- For `afterSwap`:
+
+1. Generally considered best practice to charge fees on the unspecified token.
+2. Allows for more accurate fee calculation based on the actual swap outcome.
+
+- As a result, developers can implement various fee structures, such as:
+
+1. Fixed fee amounts
+2. Percentage-based fees
+3. Tiered fee structures based on swap volume or other criteria
+
+Example of a simple percentage-based fee in `beforeSwap`:
+
+```solidity
+int128 fee = specifiedAmount * FEE_PERCENTAGE / 100;
+int128 adjustedAmount = specifiedAmount - fee;
+delta = BeforeSwapDelta.from(-adjustedAmount, 0);
+```
+
+This flexibility in fee implementation allows developers to create sophisticated economic models within their Uniswap V4 hooks, tailoring the behavior to specific use cases while maintaining the efficiency and standardization provided by the `BeforeSwapDelta` structure.
 
 ## Perspective
 
@@ -170,6 +280,15 @@ The `BeforeSwapDelta` type and its associated functions use low-level assembly c
 The `toBeforeSwapDelta` function combines the specified and unspecified deltas into a single `int256` value using bitwise operations. The `getSpecifiedDelta` and `getUnspecifiedDelta` functions extract the respective deltas using bit shifting and sign extension.
 
 By leveraging this compact representation and efficient arithmetic operations, Uniswap V4 can perform complex balance calculations and updates in a gas-optimized manner, reducing the overall cost of executing pool-related operations.
+
+## Implementation Considerations
+
+When working with `BeforeSwapDelta`, especially for implementing hook fees, consider the following:
+
+- **Fee Timing:** While fees can be implemented in either `beforeSwap` or `afterSwap`, charging fees on the unspecified token in `afterSwap` is often considered best practice. This approach can provide more accurate fee calculations based on the final swap amounts.
+- **Fee Direction:** Remember that the deltas in `BeforeSwapDelta` are from the perspective of the hook. A positive delta means the hook is receiving tokens, while a negative delta means the hook is paying out tokens.
+- **Consistency:** Ensure that your fee implementation is consistent across both `beforeSwap` and `afterSwap` hooks to maintain the integrity of the swap process.
+- **Gas Efficiency:** When implementing fees, consider the gas costs of your calculations. The compact nature of `BeforeSwapDelta` can help in optimizing gas usage, but complex fee structures might increase gas costs.
 
 ## Comparison with BalanceDelta
 
@@ -194,20 +313,119 @@ When working with `BeforeSwapDelta`, consider the following best practices:
 
 ## Example Usage in a Hook
 
+### Basic Example
+
 Here's a simple example of how `BeforeSwapDelta` might be used in a `beforeSwap` hook:
 
 ```solidity
-function beforeSwap(address, PoolKey calldata, IPoolManager.SwapParams calldata params, bytes calldata)
-    external
-    override
-    returns (int256 amountIn, BeforeSwapDelta delta, uint24)
-{
+function beforeSwap(
+    address,
+    PoolKey calldata,
+    IPoolManager.SwapParams calldata params,
+    bytes calldata
+) external override returns (int256 amountIn, BeforeSwapDelta delta, uint24) {
+    // Convert the specified amount to int128
     int128 specifiedAmount = params.amountSpecified.toInt128();
+    
+    // In this example, we're not modifying the unspecified amount
     int128 unspecifiedAmount = 0; // Calculated based on your custom logic
-
+    
+    // Create the BeforeSwapDelta
     delta = toBeforeSwapDelta(specifiedAmount, unspecifiedAmount);
+    
+    // Return the original amount as amountIn
     amountIn = params.amountSpecified;
-
+    
+    // Return 0 for lpFeeOverride as we're not changing the LP fee
     return (amountIn, delta, 0);
 }
 ```
+
+Let's break down what this basic hook is doing:
+
+1. It converts the `params.amountSpecified` to `int128`, which is required for `BeforeSwapDelta`.
+2. It sets the `unspecifiedAmount` to 0, which means this hook isn't modifying the counterpart token in the swap.
+3. It creates a `BeforeSwapDelta` using these amounts.
+4. It returns the original `amountIn`, the created `delta`, and 0 for `lpFeeOverride`.
+
+This basic example doesn't modify the swap parameters or introduce any fees. It demonstrates the minimal structure of a `beforeSwap` hook using `BeforeSwapDelta`.
+
+### Advanced Example: Implementing a Fee
+
+For a more practical use case, here's an example that implements a simple fee mechanism:
+
+```solidity
+function beforeSwap(
+    address,
+    PoolKey calldata key,
+    IPoolManager.SwapParams calldata params,
+    bytes calldata
+) external override returns (int256 amountIn, BeforeSwapDelta delta, uint24) {
+    // Determine if this is a swap for token0 or token1
+    bool zeroForOne = params.zeroForOne;
+    
+    // Convert the specified amount to int128, ensuring it's positive
+    int128 specifiedAmount = params.amountSpecified.abs().toInt128();
+    
+    // Calculate a 0.1% fee
+    int128 fee = specifiedAmount / 1000;
+    
+    // Adjust the specified amount based on swap direction
+    int128 adjustedSpecifiedAmount;
+    if (params.exactInput) {
+        // For exact input, reduce the amount by the fee
+        adjustedSpecifiedAmount = specifiedAmount - fee;
+    } else {
+        // For exact output, increase the amount by the fee
+        adjustedSpecifiedAmount = specifiedAmount + fee;
+    }
+    
+    // Create the BeforeSwapDelta
+    delta = zeroForOne 
+        ? BeforeSwapDelta.from(-adjustedSpecifiedAmount, 0)
+        : BeforeSwapDelta.from(0, -adjustedSpecifiedAmount);
+    
+    // Return the original amount as amountIn
+    amountIn = params.amountSpecified;
+    
+    // Return 0 for lpFeeOverride as we're not changing the LP fee
+    return (amountIn, delta, 0);
+}
+```
+
+**Let's break down what this hook is doing:**
+
+1. **Swap Direction Determination:**
+The hook checks `params.zeroForOne` to determine the direction of the swap (token0 to token1 or vice versa).
+2. **Amount Conversion:** It converts `params.amountSpecified` to a positive `int128`. This is necessary because `BeforeSwapDelta` works with `int128` values.
+3. **Fee Calculation:** A 0.1% fee is calculated based on the specified amount.
+4. **Amount Adjustment:** Depending on whether the swap is exact input or exact output, the specified amount is adjusted:
+
+- For exact input, the fee is subtracted (user provides less to the pool).
+- For exact output, the fee is added (user needs to provide more to the pool).
+
+5. **BeforeSwapDelta Creation:** The `BeforeSwapDelta` is created using the adjusted amount. The negative sign indicates that the pool will receive these tokens from the user. The amount is placed in either the first or second parameter of `BeforeSwapDelta.from()` depending on the swap direction.
+
+6. **Return Values:**
+
+- `amountIn` is set to the original `params.amountSpecified`. This allows the pool to account for the full amount the user is putting in or expecting out.
+- The `delta` value contains our adjusted amounts.
+- `0` is returned for `lpFeeOverride`, meaning we're not changing the default LP fee.
+
+**What This Accomplishes:**
+
+- This hook implements a 0.1% fee on the swaps.
+- It handles both exact input and exact output swaps correctly.
+- It accounts for the swap direction (token0 to token1 or vice versa).
+- The fee is taken from the input amount for exact input swaps, or added to the input amount for exact output swaps.
+- The pool will see the full input/output amount, but will only swap the adjusted amount (after accounting for the fee).
+- The difference between the original amount and the adjusted amount effectively becomes the hook's fee.
+
+**Considerations:**
+
+- This example assumes the fee is always taken in the input token. In practice, you might want to design more sophisticated fee structures.
+- The hook doesn't handle storage of collected fees. In a real implementation, you'd need to account for and possibly transfer these fees.
+- Always ensure that your hook's logic is consistent with the overall pool behavior and doesn't introduce unexpected side effects.
+- This implementation doesn't change the LP fee (lpFeeOverride is 0). In some cases, you might want to adjust this as well.
+
+As you can see from this example, by using `BeforeSwapDelta`, hooks can implement custom logic such as fees, rebates, or other modifications to the swap parameters, allowing for highly flexible and customizable pool behavior in Uniswap V4.
