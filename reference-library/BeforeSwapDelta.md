@@ -115,10 +115,7 @@ Here's how `BeforeSwapDelta` is used in the PoolManager contract:
 
 ```solidity
 function swap(PoolKey memory key, IPoolManager.SwapParams memory params, bytes calldata hookData)
-    external
-    override
-    onlyWhenUnlocked
-    noDelegateCall
+    // ...
     returns (BalanceDelta swapDelta)
 {
     // ... (other code)
