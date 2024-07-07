@@ -72,7 +72,7 @@ assembly ("memory-safe") {
 BeforeSwapDelta public constant ZERO_DELTA = BeforeSwapDelta.wrap(0);
 ```
 
-A constant representing a zero delta (no balance changes).
+A constant representing a zero delta (no balance changes). Should be used as a default return value. Most commonly used for hooks that are *not* implementing custom accounting
 
 ### getSpecifiedDelta
 
